@@ -1,4 +1,4 @@
-# ![](midicsv.png "midicsv"){width="6.6665in" height="1.2189in"}
+# ![](midicsv.png "midicsv")
 
 This page describes, in Unix manual page style, programs [available for
 downloading](https://www.fourmilab.ch/webtools/midicsv/#Download) from
@@ -73,38 +73,26 @@ for note-on and note-off events. It excludes those for channel 9
 remaining events. This program might be used to transform a MIDI file
 with a pipeline like:
 
-midicsv song.mid \| perl transpose.pl \| csvmidi \>tsong.mid
+`midicsv song.mid \| perl transpose.pl \| csvmidi \>tsong.mid`
 
-> \$offset = -12;
+```perl
+$offset = -12;
+$percussion = 9;
 
-> \$percussion = 9;
-
-> while (\$a = \<\>) {
-
-> if (\$a =\~
-> s/(\\d+,\\s\*\\d+,\\s\*Note\_\\w+,\\s\*(\\d+),\\s\*)(\\d+)//) {
-
-> \$n = \$3;
-
-> if (\$2 != \$percussion) {
-
-> \$n += \$offset;
-
-> }
-
-> if (\$n \< 0) {
-
-> next;
-
-> }
-
-> \$a = \"\$1\$n\$a\";
-
-> }
-
-> print(\$a);
-
-> }
+while ($a = <>) {
+    if ($a =~ s/(\d+,\s*\d+,\s*Note_\w+,\s*(\d+),\s*)(\d+)//) {
+        $n = $3;
+        if ($2 != $percussion) {
+            $n += $offset;
+        }
+        if ($n < 0) {
+            next;
+        }
+        $a = "$1$n$a";
+    }
+    print($a);
+}
+```
 
 ### Chorus     (*chorus.pl*)
 
@@ -117,40 +105,27 @@ notes. When used with a negative *\$offset* of one or more octave, this
 "fattens" the bass of a composition. Try it! This program may be used to
 transform a MIDI file with a pipeline like:
 
-midicsv song.mid \| perl chorus.pl \| csvmidi \>tsong.mid
+`midicsv song.mid \| perl chorus.pl \| csvmidi \>tsong.mid`
 
-> \$offset = -12;
+```perl
+$offset = -12;
+$percussion = 9;
 
-> \$percussion = 9;
-
-> while (\$a = \<\>) {
-
-> print(\$a);
-
-> if (\$a =\~
-> s/(\\d+,\\s\*\\d+,\\s\*Note\_\\w+,\\s\*(\\d+),\\s\*)(\\d+)//) {
-
-> if (\$2 != \$percussion) {
-
-> \$n = \$3;
-
-> \$n += \$offset;
-
-> if (\$n \< 0) {
-
-> next;
-
-> }
-
-> \$a = \"\$1\$n\$a\";
-
-> print(\$a);
-
-> }
-
-> }
-
-> }
+while ($a = <>) {
+    print($a);
+    if ($a =~ s/(\d+,\s*\d+,\s*Note_\w+,\s*(\d+),\s*)(\d+)//) {
+        if ($2 != $percussion) {
+            $n = $3;
+            $n += $offset;
+            if ($n < 0) {
+                next;
+            }
+            $a = "$1$n$a";
+            print($a);
+        }
+    }
+}
+```
 
 ### Extract Channel     (*exchannel.pl*)
 
@@ -160,32 +135,25 @@ rest of the MIDI file structure. With *\$which_channel* set to 9, as in
 this example, this program will extract the percussion track from a
 General MIDI file. You can run this program with a pipeline such as:
 
-midicsv song.mid \| perl exchannel.pl \| csvmidi \>tsong.mid
+`midicsv song.mid \| perl exchannel.pl \| csvmidi \>tsong.mid`
 
-> \$which_channel = 9;
+```perl
+$which_channel = 9;
 
-> while (\$a = \<\>) {
+while ($a = <>) {
+    if (!($a =~ m/\s*[\#\;]/)) { 	# Ignore comment lines
+        if ($a =~ m/\s*\d+\s*,\s*\d+\s*,\s*\w+_c\s*,\s*(\d+)/) {
+            if ($1 == $which_channel) {
+    		        print($a);
+    		    }
+        } else {
+            print($a);
+        }
+    }
+}
 
-> if (!(\$a =\~ m/\\s\*\[\\#\\;\]/)) { \# Ignore comment lines
+```
 
-> if (\$a =\~
-> m/\\s\*\\d+\\s\*,\\s\*\\d+\\s\*,\\s\*\\w+\_c\\s\*,\\s\*(\\d+)/) {
-
-> if (\$1 == \$which_channel) {
-
-> print(\$a);
-
-> }
-
-> } else {
-
-> print(\$a);
-
-> }
-
-> }
-
-> }
 
 ### Dumbest Drummer    (*drummer.pl*)
 
@@ -199,107 +167,70 @@ which defines two hashes that allow you to specify General MIDI patches
 (programs/instruments) and percussion note numbers by name. To run this
 program and create a ready-to-play MIDI file, use the pipeline:
 
-perl drummer.pl \| csvmidi \>drumtrack.mid
+`perl drummer.pl \| csvmidi \>drumtrack.mid`
 
-> require \'general_midi.pl\';
+```perl
+require 'general_midi.pl';
 
-> \# Repeats, Note,
+#   	   Repeats, Note,
+#   	      Duration, Velocity
+@track = (4, $GM_Percussion{'Acoustic Bass Drum'},
+    	    	  480, 127,
+    	    4, $GM_Percussion{'Low-Mid Tom'},
+	            240, 127,
+	        1, 0, 120, 0,
+	        2,  $GM_Percussion{'Hand Clap'},
+	      	   240, 127,
+	        1, 0, 240, 0
+	       );
 
-> \# Duration, Velocity
+print << "EOD";
+0, 0, Header, 1, 1, 480
+1, 0, Start_track
+1, 0, Tempo, 500000
+EOD
 
-> \@track = (4, \$GM_Percussion{\'Acoustic Bass Drum\'},
+$time = 0;
 
-> 480, 127,
+&loop(4, @track);
 
-> 4, \$GM_Percussion{\'Low-Mid Tom\'},
+print << "EOD";
+1, $time, End_track
+0, 0, End_of_file
+EOD
 
-> 240, 127,
+sub note {	# &note($note_number, $duration [, $velocity])
+ 	  local ($which, $duration, $vel) = @_;
 
-> 1, 0, 120, 0,
+	  if ($which > 0) {
+	      if (!defined($vel)) {
+	      	$vel = 127;
+	      }
+ 	      print("1, $time, Note_on_c, 9, $which, $vel\n");
+	  }
+	  $time += $duration;
+	  if ($which > 0) {
+    	    print("1, $time, Note_off_c, 9, $which, 0\n");
+	  }
+}
 
-> 2, \$GM_Percussion{\'Hand Clap\'},
+sub loop {	# &loop($ntimes, @track)
+    local ($loops, @tr) = @_;
+	  local ($i, $r);
 
-> 240, 127,
+    for ($i = 0; $i < $loops; $i++) {
+	     local @t = @tr;
+	     while ($#t > 0) {
+    		  local ($repeats, $note, $duration, $velocity) =
+		          splice(@t, 0, 4);
+		      for ($r = 0; $r < $repeats; $r++) {
+		          &note($note, $duration, $velocity);
+      		}
+	     }
+	  }
+}
+```
 
-> 1, 0, 240, 0
-
-> );
-
-> print \<\< \"EOD\";
-
-> 0, 0, Header, 1, 1, 480
-
-> 1, 0, Start_track
-
-> 1, 0, Tempo, 500000
-
-> EOD
-
-> \$time = 0;
-
-> &loop(4, \@track);
-
-> print \<\< \"EOD\";
-
-> 1, \$time, End_track
-
-> 0, 0, End_of_file
-
-> EOD
-
-> sub note { \# &note(\$note_number, \$duration \[, \$velocity\])
-
-> local (\$which, \$duration, \$vel) = \@\_;
-
-> if (\$which \> 0) {
-
-> if (!defined(\$vel)) {
-
-> \$vel = 127;
-
-> }
-
-> print(\"1, \$time, Note_on_c, 9, \$which, \$vel\\n\");
-
-> }
-
-> \$time += \$duration;
-
-> if (\$which \> 0) {
-
-> print(\"1, \$time, Note_off_c, 9, \$which, 0\\n\");
-
-> }
-
-> }
-
-> sub loop { \# &loop(\$ntimes, \@track)
-
-> local (\$loops, \@tr) = \@\_;
-
-> local (\$i, \$r);
-
-> for (\$i = 0; \$i \< \$loops; \$i++) {
-
-> local \@t = \@tr;
-
-> while (\$#t \> 0) {
-
-> local (\$repeats, \$note, \$duration, \$velocity) =
-
-> splice(@t, 0, 4);
-
-> for (\$r = 0; \$r \< \$repeats; \$r++) {
-
-> &note(\$note, \$duration, \$velocity);
-
-> }
-
-> }
-
-> }
-
-> }
 
 ### Stoned Guitarist    (*acomp.pl*)
 
@@ -312,125 +243,79 @@ arbitrary MIDI music files by writing CSV which is fed through
 **csvmidi**. This example also uses the definitions in the
 **general_midi.pl**. It may be run as follows:
 
-perl acomp.pl \| csvmidi \>performance.mid
+`perl acomp.pl \| csvmidi \>performance.mid`
 
-> require \'general_midi.pl\';
+```perl
+require 'general_midi.pl';
 
-> \$instrument = \$GM_Patch{\'Distortion Guitar\'};
+$instrument = $GM_Patch{'Distortion Guitar'};
+$tonespan = 32;
+$num_notes = 120;
+$percussion = $GM_Percussion{'Ride Cymbal 1'};
+$beat = 6;
 
-> \$tonespan = 32;
+print << "EOD";
+0, 0, Header, 1, 1, 480
+1, 0, Start_track
+1, 0, Tempo, 500000
+1, 0, Program_c, 1, $instrument
+EOD
 
-> \$num_notes = 120;
+$time = 0;
+srand(time());
 
-> \$percussion = \$GM_Percussion{\'Ride Cymbal 1\'};
+for ($i = 0; $i < $num_notes; $i++) {
+    $n = 60 + int((rand() * $tonespan) - int($tonespan / 2));
+       	$notelength = 120 + (60 * int(rand() * 6));
+	  &note(1, $n, $notelength, 127);
+	  if (($i % $beat) == 0) {
+	     print("1, $time, Note_on_c, 9, $percussion, 127\n");
+	  } elsif (($i % $beat) == ($beat - 1)) {
+	     print("1, $time, Note_off_c, 9, $percussion, 0\n");
+	  }
+}
 
-> \$beat = 6;
+#	Cymbal crash at end
+$cymbal = $GM_Percussion{'Crash Cymbal 2'};
+print("1, $time, Note_on_c, 9, $cymbal, 127\n");
+$time += 480;
+print("1, $time, Note_off_c, 9, $cymbal, 0\n");
 
-> print \<\< \"EOD\";
+#	Audience applause
+$time += 480;
+print("1, $time, Program_c, 1, $GM_Patch{'Applause'}\n");
+print("1, $time, Note_on_c, 1, 60, 100\n");
+for ($i = 16; $i <= 32; $i++) {
+  	$time += 120;
+	  $v = int(127 * ($i / 32));
+	  print("1, $time, Poly_aftertouch_c, 1, 60, $v\n");
+}
+for ($i = 32; $i >= 0; $i--) {
+  	$time += 240;
+	  $v = int(127 * ($i / 32));
+	  print("1, $time, Poly_aftertouch_c, 1, 60, $v\n");
+}
+print("1, $time, Note_off_c, 1, 60, 0\n");
 
-> 0, 0, Header, 1, 1, 480
+print << "EOD";
+1, $time, End_track
+0, 0, End_of_file
+EOD
 
-> 1, 0, Start_track
+# &note($channel, $note_number, $duration [, $velocity])
+sub note {
+ 	local ($channel, $which, $duration, $vel) = @_;
 
-> 1, 0, Tempo, 500000
+	if (!defined($vel)) {
+	    $vel = 127;
+	}
+ 	print("1, $time, Note_on_c, $channel, $which, $vel\n");
+	$time += $duration;
+ 	print("1, $time, Note_off_c, $channel, $which, 0\n");
+}
+```
 
-> 1, 0, Program_c, 1, \$instrument
-
-> EOD
-
-> \$time = 0;
-
-> srand(time());
-
-> for (\$i = 0; \$i \< \$num_notes; \$i++) {
-
-> \$n = 60 + int((rand() \* \$tonespan) - int(\$tonespan / 2));
-
-> \$notelength = 120 + (60 \* int(rand() \* 6));
-
-> &note(1, \$n, \$notelength, 127);
-
-> if ((\$i % \$beat) == 0) {
-
-> print(\"1, \$time, Note_on_c, 9, \$percussion, 127\\n\");
-
-> } elsif ((\$i % \$beat) == (\$beat - 1)) {
-
-> print(\"1, \$time, Note_off_c, 9, \$percussion, 0\\n\");
-
-> }
-
-> }
-
-> \# Cymbal crash at end
-
-> \$cymbal = \$GM_Percussion{\'Crash Cymbal 2\'};
-
-> print(\"1, \$time, Note_on_c, 9, \$cymbal, 127\\n\");
-
-> \$time += 480;
-
-> print(\"1, \$time, Note_off_c, 9, \$cymbal, 0\\n\");
-
-> \# Audience applause
-
-> \$time += 480;
-
-> print(\"1, \$time, Program_c, 1, \$GM_Patch{\'Applause\'}\\n\");
-
-> print(\"1, \$time, Note_on_c, 1, 60, 100\\n\");
-
-> for (\$i = 16; \$i \<= 32; \$i++) {
-
-> \$time += 120;
-
-> \$v = int(127 \* (\$i / 32));
-
-> print(\"1, \$time, Poly_aftertouch_c, 1, 60, \$v\\n\");
-
-> }
-
-> for (\$i = 32; \$i \>= 0; \$i\--) {
-
-> \$time += 240;
-
-> \$v = int(127 \* (\$i / 32));
-
-> print(\"1, \$time, Poly_aftertouch_c, 1, 60, \$v\\n\");
-
-> }
-
-> print(\"1, \$time, Note_off_c, 1, 60, 0\\n\");
-
-> print \<\< \"EOD\";
-
-> 1, \$time, End_track
-
-> 0, 0, End_of_file
-
-> EOD
-
-> \# &note(\$channel, \$note_number, \$duration \[, \$velocity\])
-
-> sub note {
-
-> local (\$channel, \$which, \$duration, \$vel) = \@\_;
-
-> if (!defined(\$vel)) {
-
-> \$vel = 127;
-
-> }
-
-> print(\"1, \$time, Note_on_c, \$channel, \$which, \$vel\\n\");
-
-> \$time += \$duration;
-
-> print(\"1, \$time, Note_off_c, \$channel, \$which, 0\\n\");
-
-> }
-
-## [](file.gif){#anchor} [Download midicsv-1.1.tar.gz](https://www.fourmilab.ch/webtools/midicsv/midicsv-1.1.tar.gz) (Gzipped TAR archive)
+## ![](file.gif) [Download midicsv-1.1.tar.gz](https://www.fourmilab.ch/webtools/midicsv/midicsv-1.1.tar.gz) (Gzipped TAR archive)
 
 The archive contains source code for the utilities, a Makefile for Unix
 systems, and ready-to-run executables for 32-bit Windows platforms. If
@@ -440,7 +325,7 @@ containing just those files.
 
 ## Manual Pages
 
-# []{#anchor-1}midicsv
+# midicsv
 
 ## NAME
 
@@ -493,7 +378,7 @@ Please report problems to bugs **at** fourmilab.ch.
 [**csvmidi**](https://www.fourmilab.ch/webtools/midicsv/#csvmidi.1)(1),
 [**midicsv**](https://www.fourmilab.ch/webtools/midicsv/#midicsv.5)(5)
 
-# []{#anchor-2}csvmidi
+# csvmidi
 
 ## NAME
 
@@ -577,7 +462,7 @@ Please report problems to bugs **at** fourmilab.ch.
 [**midicsv**](https://www.fourmilab.ch/webtools/midicsv/#midicsv.1)(1),
 [**midicsv**](https://www.fourmilab.ch/webtools/midicsv/#midicsv.5)(5)
 
-# []{#anchor-3}midicsv File Format
+# midicsv File Format
 
 ## NAME
 
@@ -634,7 +519,7 @@ blank lines are ignored.
 
 ### File Structure Records
 
-**0, 0, Header***, format, nTracks, division*
+**0, 0, Header** *, format, nTracks, division*
 
 > The first record of a CSV MIDI file is always the **Header** record.
 > Parameters are *format*: the MIDI file type (0, 1, or 2), *nTracks*:
@@ -647,14 +532,14 @@ blank lines are ignored.
 > The last record in a CSV MIDI file is always an **End_of_file**
 > record. Its **Track** and **Time** fields are always zero.
 
-*Track, ***0, Start_track**
+*Track,* **0, Start_track**
 
 > A **Start_track** record marks the start of a new track, with the
 > *Track* field giving the track number. All records between the
 > **Start_track** record and the matching **End_track** will have the
 > same *Track* field.
 
-*Track, Time, ***End_track**
+*Track, Time,* **End_track**
 
 > An **End_track** marks the end of events for the specified *Track*.
 > The *Time* field gives the total duration of the track, which will be
@@ -680,19 +565,19 @@ CSV files should take care to avoid buffer overflows or truncation
 resulting from lines containing long string items. All meta-events which
 take a text argument are identified by a suffix of "**\_t**".
 
-*Track, Time, ***Title_t, ***Text*
+*Track, Time,* **Title_t,** *Text*
 
 > The *Text* specifies the title of the track or sequence. The first
 > **Title** meta-event in a type 0 MIDI file, or in the first track of a
 > type 1 file gives the name of the work. Subsequent **Title**
 > meta-events in other tracks give the names of those tracks.
 
-*Track, Time, ***Copyright_t, ***Text*
+*Track, Time,* **Copyright_t,** *Text*
 
 > The *Text* specifies copyright information for the sequence. This is
 > usually placed at time 0 of the first track in the sequence.
 
-*Track, Time, ***Instrument_name_t, ***Text*
+*Track, Time,* **Instrument_name_t,** *Text*
 
 > The *Text* names the instrument intended to play the contents of this
 > track, This is usually placed at time 0 of the track. Note that this
@@ -703,29 +588,29 @@ take a text argument are identified by a suffix of "**\_t**".
 > for the track when the sequence is used on a synthesiser with a
 > different patch set.
 
-*Track, Time, ***Marker_t, ***Text*
+*Track, Time,* **Marker_t,** *Text*
 
 > The *Text* marks a point in the sequence which occurs at the given
 > *Time*, for example \"Third Movement\".
 
-*Track, Time, ***Cue_point_t, ***Text*
+*Track, Time,* **Cue_point_t,** *Text*
 
 > The *Text* identifies synchronisation point which occurs at the
 > specified *Time*, for example, \"Door slams\".
 
-*Track, Time, ***Lyric_t, ***Text*
+*Track, Time,* **Lyric_t,** *Text*
 
 > The *Text* gives a lyric intended to be sung at the given *Time*.
 > Lyrics are often broken down into separate syllables to time-align
 > them more precisely with the sequence.
 
-*Track, Time, ***Text_t, ***Text*
+*Track, Time,* **Text_t,** *Text*
 
 > This meta-event supplies an arbitrary *Text* string tagged to the
 > *Track* and *Time*. It can be used for textual information which
 > doesn\'t fall into one of the more specific categories given above.
 
-*Track, ***0, Sequence_number, ***Number*
+*Track,* **0, Sequence_number,** *Number*
 
 > This meta-event specifies a sequence *Number* between 0 and 65535,
 > used to arrange multiple tracks in a type 2 MIDI file, or to identify
@@ -733,7 +618,7 @@ take a text argument are identified by a suffix of "**\_t**".
 > played. The **Sequence_number** meta-event should occur at **Time**
 > zero, at the start of the track.
 
-*Track, Time, ***MIDI_port, ***Number*
+*Track, Time,* **MIDI_port,** *Number*
 
 > This meta-event specifies that subsequent events in the **Track**
 > should be sent to MIDI port (bus) *Number*, between 0 and 255. This
@@ -741,7 +626,7 @@ take a text argument are identified by a suffix of "**\_t**".
 > but may appear within a track should the need arise to change the port
 > while the track is being played.
 
-*Track, Time, ***Channel_prefix, ***Number*
+*Track, Time,* **Channel_prefix,** *Number*
 
 > This meta-event specifies the MIDI channel that subsequent meta-events
 > and **System_exclusive** events pertain to. The channel *Number*
@@ -749,7 +634,7 @@ take a text argument are identified by a suffix of "**\_t**".
 > large as 255, but the consequences of specifying a channel number
 > greater than 15 are undefined.
 
-*Track, Time, ***Time_signature, ***Num, Denom, Click, NotesQ*
+*Track, Time,* **Time_signature,** *Num, Denom, Click, NotesQ*
 
 > The time signature, metronome click rate, and number of 32nd notes per
 > MIDI quarter note (24 MIDI clock times) are given by the numeric
@@ -761,7 +646,7 @@ take a text argument are identified by a suffix of "**\_t**".
 > MIDI quarter note time of 24 clocks (8 for the default MIDI quarter
 > note definition).
 
-*Track, Time, ***Key_signature, ***Key, Major/Minor*
+*Track, Time,* **Key_signature,** *Key, Major/Minor*
 
 > The key signature is specified by the numeric *Key* value, which is 0
 > for the key of C, a positive value for each sharp above C, or a
@@ -769,7 +654,7 @@ take a text argument are identified by a suffix of "**\_t**".
 > to 7. The *Major/Minor* field is a quoted string which will be
 > **major** for a major key and **minor** for a minor key.
 
-*Track, Time, ***Tempo, ***Number*
+*Track, Time,* **Tempo,** *Number*
 
 > The tempo is specified as the *Number* of microseconds per quarter
 > note, between 1 and 16777215. A value of 500000 corresponds to 120
@@ -777,14 +662,14 @@ take a text argument are identified by a suffix of "**\_t**".
 > **Tempo** *value*, take the quotient from dividing 60,000,000 by the
 > beats per minute.
 
-*Track, ***0, SMPTE_offset, ***Hour, Minute, Second, Frame, FracFrame*
+*Track,* **0, SMPTE_offset,** *Hour, Minute, Second, Frame, FracFrame*
 
 > This meta-event, which must occur with a zero **Time** at the start of
 > a track, specifies the SMPTE time code at which it should start
 > playing. The *FracFrame* field gives the fractional frame time (0 to
 > 99).
 
-*Track, Time, ***Sequencer_specific, ***Length, Data, ...*
+*Track, Time,* **Sequencer_specific,** *Length, Data, ...*
 
 > The **Sequencer_specific** meta-event is used to store
 > vendor-proprietary data in a MIDI file. The *Length* can be any value
@@ -793,7 +678,7 @@ take a text argument are identified by a suffix of "**\_t**".
 > long; programs which process MIDI CSV files should be careful to
 > protect against buffer overflows and truncation of these records.
 
-*Track, Time, ***Unknown_meta_event, ***Type, Length, Data, ...*
+*Track, Time,* **Unknown_meta_event,** *Type, Length, Data, ...*
 
 > If **midicsv** encounters a meta-event with a code not defined by the
 > standard MIDI file specification, it outputs an unknown meta-event
@@ -814,7 +699,7 @@ parameters. To permit programs which process CSV files to easily
 distinguish them from meta-events, names of channel events all have a
 suffix of "**\_c**".
 
-*Track, Time, ***Note_on_c, ***Channel, Note, Velocity*
+*Track, Time,* **Note_on_c,** *Channel, Note, Velocity*
 
 > Send a command to play the specified *Note* (Middle C is defined as
 > *Note* number 60; all other notes are relative in the MIDI
@@ -823,13 +708,13 @@ suffix of "**\_c**".
 > **Note_on_c** event with *Velocity* zero is equivalent to a
 > **Note_off_c**.
 
-*Track, Time, ***Note_off_c, ***Channel, Note, Velocity*
+*Track, Time,* **Note_off_c,** *Channel, Note, Velocity*
 
 > Stop playing the specified *Note* on the given *Channel*. The
 > *Velocity* should be zero, but you never know what you\'ll find in a
 > MIDI file.
 
-*Track, Time, ***Pitch_bend_c, ***Channel, Value*
+*Track, Time,* **Pitch_bend_c,** *Channel, Value*
 
 > Send a pitch bend command of the specified *Value* to the given
 > *Channel*. The pitch bend *Value* is a 14 bit unsigned integer and
@@ -838,7 +723,7 @@ suffix of "**\_c**".
 > highest. The actual change in pitch these values produce is
 > unspecified.
 
-*Track, Time, ***Control_c, ***Channel, Control_num, Value*
+*Track, Time,* **Control_c,** *Channel, Control_num, Value*
 
 > Set the controller *Control_num* on the given *Channel* to the
 > specified *Value*. *Control_num* and *Value* must be in the inclusive
@@ -850,7 +735,7 @@ suffix of "**\_c**".
 > capabilities usually assign reverberation to controller 91 and chorus
 > to controller 93.
 
-*Track, Time, ***Program_c, ***Channel, Program_num*
+*Track, Time,* **Program_c,** *Channel, Program_num*
 
 > Switch the specified *Channel* to program (patch) *Program_num*, which
 > must be between 0 and 127. The program or patch selects which
@@ -867,7 +752,7 @@ suffix of "**\_c**".
 > one less than the patch numbers given in an instrument\'s
 > documentation.
 
-*Track, Time, ***Channel_aftertouch_c, ***Channel, Value*
+*Track, Time,* **Channel_aftertouch_c,** *Channel, Value*
 
 > When a key is held down after being pressed, some synthesisers send
 > the pressure, repeatedly if it varies, until the key is released, but
@@ -878,7 +763,7 @@ suffix of "**\_c**".
 > *Value* (0 to 127) is typically taken to apply to the last note
 > played, but instruments are not guaranteed to behave in this manner.
 
-*Track, Time, ***Poly_aftertouch_c, ***Channel, Note, Value*
+*Track, Time,* **Poly_aftertouch_c,** *Channel, Note, Value*
 
 > Polyphonic synthesisers (those capable of playing multiple notes
 > simultaneously on a single channel), often provide independent
@@ -890,7 +775,7 @@ suffix of "**\_c**".
 System Exclusive events permit storing vendor-specific information to be
 transmitted to that vendor\'s products.
 
-*Track, Time, ***System_exclusive, ***Length, Data, ...*
+*Track, Time,* **System_exclusive,** *Length, Data, ...*
 
 > The *Length* bytes of *Data* (0 to 255) are sent at the specified
 > *Time* to the MIDI channel defined by the most recent
@@ -899,7 +784,7 @@ transmitted to that vendor\'s products.
 > Programs which process MIDI CSV files should be careful to protect
 > against buffer overflows and truncation of these records.
 
-*Track, Time, ***System_exclusive_packet, ***Length, Data, ...*
+*Track, Time,* **System_exclusive_packet,** *Length, Data, ...*
 
 > The *Length* bytes of *Data* (0 to 255) are sent at the specified
 > *Time* to the MIDI channel defined by the most recent
@@ -918,51 +803,31 @@ Encounters of the Third Kind* using an organ patch from the General MIDI
 instrument set. When processed by **midicsv** and sent to a synthesiser
 which conforms to General MIDI, the sequence will be played.
 
+```csv
 0, 0, Header, 1, 2, 480
-
 1, 0, Start_track
-
 1, 0, Title_t, \"Close Encounters\"
-
 1, 0, Text_t, \"Sample for MIDIcsv Distribution\"
-
 1, 0, Copyright_t, \"This file is in the public domain\"
-
 1, 0, Time_signature, 4, 2, 24, 8
-
 1, 0, Tempo, 500000
-
 1, 0, End_track
-
 2, 0, Start_track
-
 2, 0, Instrument_name_t, \"Church Organ\"
-
 2, 0, Program_c, 1, 19
-
 2, 0, Note_on_c, 1, 79, 81
-
 2, 960, Note_off_c, 1, 79, 0
-
 2, 960, Note_on_c, 1, 81, 81
-
 2, 1920, Note_off_c, 1, 81, 0
-
 2, 1920, Note_on_c, 1, 77, 81
-
 2, 2880, Note_off_c, 1, 77, 0
-
 2, 2880, Note_on_c, 1, 65, 81
-
 2, 3840, Note_off_c, 1, 65, 0
-
 2, 3840, Note_on_c, 1, 72, 81
-
 2, 4800, Note_off_c, 1, 72, 0
-
 2, 4800, End_track
-
 0, 0, End_of_file
+```
 
 ## BUGS
 
